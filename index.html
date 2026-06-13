@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Nobel Biocare 訂單系統</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -866,8 +865,6 @@ function submitOrder(){
     msg.classList.add("show"); inp.focus(); return;
   }
   inp.style.borderColor=""; msg.classList.remove("show");
-  const fname=doExcel(name,lab,patient);
-  doMail(name,lab,patient,fname);
   closeCustModal();
   sendToGoogleSheets(name,lab,patient);
 }
@@ -894,14 +891,12 @@ async function sendToGoogleSheets(custName,lab,patient){
     });
     // no-cors returns opaque response — assume success if no error thrown
     setUpUI("success","訂單已送出！",
-      "訂單已成功送出<br>"+
-      "郵件草稿已開啟，請寄送至<br>"+
-      '<span class="mail-chip">'+MAIL+'</span>');
+      "訂單已成功同步至 Google 試算表！");
     cart=[];renderCart();
   }catch(e){
     setUpUI("error","同步失敗",
       '<span class="err-txt">連線失敗：'+e.message.substring(0,80)+'</span><br><br>'+
-      "Excel 已下載至電腦<br>請手動上傳試算表");
+      "請確認網路連線後再試一次");
   }
 }
 
@@ -918,44 +913,6 @@ function setUpUI(state,title,body){
 }
 function closeUpload(){document.getElementById("up-overlay").classList.remove("open");}
 
-/* ── EXCEL ── */
-function doExcel(custName,lab,patient){
-  const now=new Date();
-  const ds=now.getFullYear()+"/"+(now.getMonth()+1).toString().padStart(2,"0")+"/"+now.getDate().toString().padStart(2,"0");
-  const ts=now.getHours().toString().padStart(2,"0")+":"+now.getMinutes().toString().padStart(2,"0");
-  const fname=ds.replace(/\//g,"")+"_"+custName+(patient?"_"+patient:"")+"_訂單.xlsx";
-  const rows=[["Nobel Biocare 訂單確認","","","",""]];
-  rows.push(["客戶名稱",custName,"","",""]);
-  if(lab)rows.push(["技工所",lab,"","",""]);
-  if(patient)rows.push(["病患",patient,"","",""]);
-  rows.push(["訂單日期",ds+" "+ts,"","",""]);
-  rows.push(["","","","",""]);
-  rows.push(["序號","類別","編號","產品名稱","數量（件）"]);
-  cart.forEach((c,i)=>rows.push([i+1,c.cat,c.code,c.name,c.qty]));
-  rows.push(["","","","",""]);
-  rows.push(["","","","合計件數",cart.reduce((s,c)=>s+c.qty,0)]);
-  const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"]=[{wch:6},{wch:14},{wch:18},{wch:50},{wch:12}];
-  ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:4}}];
-  XLSX.utils.book_append_sheet(wb,ws,"訂單");
-  XLSX.writeFile(wb,fname);
-  return fname;
-}
-
-/* ── MAIL ── */
-function doMail(custName,lab,patient,fname){
-  const totalQty=cart.reduce((s,c)=>s+c.qty,0);
-  const subj=encodeURIComponent("[Nobel Biocare 訂單] "+custName+(patient?" / "+patient:"")+" — "+new Date().toLocaleDateString("zh-TW"));
-  const lines=["客戶："+custName];
-  if(lab)lines.push("技工所："+lab);
-  if(patient)lines.push("病患："+patient);
-  lines.push("日期："+new Date().toLocaleDateString("zh-TW"),
-    "共 "+cart.length+"種，合計 "+totalQty+"件","","─── 訂單明細 ───");
-  cart.forEach((c,i)=>lines.push((i+1)+". ["+c.code+"] "+c.name+"  ×"+c.qty));
-  lines.push("","附件："+fname);
-  window.location.href="mailto:"+MAIL+"?subject="+subj+"&body="+encodeURIComponent(lines.join("\n"));
-}
 
 /* ── UTILS ── */
 function cid(s){return s.replace(/[^a-zA-Z0-9]/g,"_");}
